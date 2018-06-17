@@ -13,16 +13,17 @@ object Main {
     val client = new MovieClient()
 
     val allMovies = Await.result(
-      client.createMovie(
+      client.getAllMovies(title = "Test", avgRatingOpt = None)
+      /*.createMovie(
         model.Movie(
           2126,
-          "Test movie",
+          "Scala movie",
           -1,
           -1,
           "scala",
           None,
           "UA"
-        )),
+        ))*/,
       5.seconds
     )
 
