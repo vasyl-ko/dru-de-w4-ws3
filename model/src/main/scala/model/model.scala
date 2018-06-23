@@ -63,3 +63,16 @@ case class Actor(id: Int, firstName: String, lastName: String, gender: String)
 
 @JsonCodec
 case class MovieCast(actorId: Int, movieId: Int, role: String)
+
+
+@JsonCodec sealed trait Command
+object Command {
+  case class Ping(num: Int) extends Command
+  case class CreateMovie(movie: model.Movie) extends Command
+}
+@JsonCodec sealed trait WsResponse
+object WsResponse {
+  case class Pong(num: Int) extends WsResponse
+  case class CreateMovieResponse(message: String) extends WsResponse
+  case class InvalidCommand(message: String) extends WsResponse
+}

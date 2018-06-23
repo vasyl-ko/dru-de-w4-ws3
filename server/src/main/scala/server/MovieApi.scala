@@ -3,13 +3,15 @@ package server
 import repositories.MovieRepository
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server._
+import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import io.circe._
-import io.circe.syntax._
+import scala.concurrent.{ExecutionContext, Future}
 
-class MovieApi(movieRepository: MovieRepository)
+
+class MovieApi(movieRepository: MovieRepository)(implicit ec: ExecutionContext)
     extends Directives
-    with FailFastCirceSupport {
+    with FailFastCirceSupport
+    with StrictLogging {
   def index: Route =
     pathSingleSlash {
       get {
@@ -37,7 +39,7 @@ class MovieApi(movieRepository: MovieRepository)
     path("movies" / "all") {
       val futureMovies = movieRepository.findAll()
       onSuccess(futureMovies) { movies =>
-        complete(moviesToJson(movies))
+        complete(movies)
       }
     }
 
@@ -73,10 +75,19 @@ class MovieApi(movieRepository: MovieRepository)
       }
     }
 
-  def routes: Route =
-    index ~ findAllMovies ~ createFilm ~ findAllByFilters
-
-  def moviesToJson(movies: Vector[model.Movie]): Json = {
-    movies.asJson
+  def movieInfo: Route = path("movies" / IntNumber / "info") { movieId =>
+    onSuccess(movieRepository.getInfo(movieId)) {
+      case Some(movie) => complete(movie)
+      case None =>
+        complete(
+          HttpResponse(
+            status = StatusCodes.NotFound,
+            entity = s"Not found movie with id $movieId"
+          )
+        )
+    }
   }
+
+  def routes: Route =
+    index ~ findAllMovies ~ createFilm ~ findAllByFilters ~ movieInfo
 }

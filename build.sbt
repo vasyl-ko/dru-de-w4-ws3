@@ -16,8 +16,17 @@ val circeDeps = Seq(
 
 val akkaDeps = Seq(
   "com.typesafe.akka" %% "akka-http" % "10.1.2",
-  "com.typesafe.akka" %% "akka-stream" % "2.5.12",
+  "com.typesafe.akka" %% "akka-stream" % "2.5.13",
   "de.heikoseeberger" %% "akka-http-circe" % "1.21.0"
+)
+
+val loggingDeps = Seq(
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+  "ch.qos.logback" % "logback-classic" % "1.1.7"
+)
+
+val akkaSettings = scalaSettings ++ Seq(
+  libraryDependencies ++= akkaDeps ++ loggingDeps
 )
 
 lazy val model =
@@ -32,9 +41,8 @@ lazy val repositories =
     .dependsOn(model)
     .settings(scalaSettings: _*)
     .settings(
-      libraryDependencies ++= Seq(
+      libraryDependencies ++= loggingDeps ++ Seq(
         "com.typesafe.slick" %% "slick" % "3.2.3",
-        "org.slf4j" % "slf4j-nop" % "1.6.4",
         "com.typesafe.slick" %% "slick-hikaricp" % "3.2.3",
         "org.postgresql" % "postgresql" % "42.2.2",
         "com.github.tminglei" %% "slick-pg" % "0.16.2"
@@ -44,18 +52,16 @@ lazy val repositories =
 lazy val server =
   Project(id = "server", base = file("server"))
     .dependsOn(repositories)
-    .settings(scalaSettings: _*)
-    .settings(
-      libraryDependencies ++= akkaDeps
-    )
+    .settings(akkaSettings:_*)
 
 lazy val client = project.in(file("client"))
   .dependsOn(model)
-  .settings(scalaSettings: _*)
-  .settings(
-    libraryDependencies ++= akkaDeps
-  )
+  .settings(akkaSettings:_*)
+
+lazy val streams = project.in(file("streams"))
+  .dependsOn(client)
+  .settings(akkaSettings:_*)
 
 lazy val root =
   Project("akka-http-workshop", file("."))
-    .aggregate(server, client)
+    .aggregate(server, client, streams)

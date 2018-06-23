@@ -69,4 +69,17 @@ class MovieClient(
     )
     response.map(_.toString())
   }
+
+  def getInfo(movieId: Int): Future[Movie.Info] = {
+    val response = http.singleRequest(
+      HttpRequest(
+        HttpMethods.GET,
+        s"http://localhost:8080/movies/$movieId/info"
+      )
+    )
+    response.flatMap {
+      case HttpResponse(StatusCodes.OK, _, responseEntity, _) =>
+        Unmarshal(responseEntity).to[Movie.Info]
+    }
+  }
 }
