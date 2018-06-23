@@ -6,7 +6,9 @@ import akka.http.scaladsl.server._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import scala.concurrent.{ExecutionContext, Future}
-
+import akka.stream.scaladsl._
+import akka.http.scaladsl.model.ws._
+import io.circe.parser._
 
 class MovieApi(movieRepository: MovieRepository)(implicit ec: ExecutionContext)
     extends Directives
@@ -88,6 +90,49 @@ class MovieApi(movieRepository: MovieRepository)(implicit ec: ExecutionContext)
     }
   }
 
+  def websocket: Route = path("movies" / "ws") {
+    handleWebSocketMessages(wsFlow)
+  }
+
+  private val wsFlow = {
+    val messagesFlow = Flow[Message]
+      .map(_.asTextMessage)
+      .collect {
+        case TextMessage.Strict(textMessage) => textMessage
+      }
+
+    val parsingFlow = Flow[String]
+      .map(decode[model.Command])
+      .mapAsync(2) {
+        case Left(error) =>
+          Future.successful(model.WsResponse.InvalidCommand(error.getMessage))
+
+        case Right(model.Command.Ping(num)) =>
+          Future.successful(model.WsResponse.Pong(num))
+
+        case Right(model.Command.CreateMovie(movie)) =>
+          movieRepository
+            .insert(movie)
+            .map { insertResult =>
+              model.WsResponse.CreateMovieResponse(
+                s"Insert result: $insertResult")
+            }
+      }
+
+    import io.circe.syntax._
+
+    val writingFlow = Flow[model.WsResponse]
+      .map(_.asJson.spaces2)
+      .map(TextMessage(_))
+
+    messagesFlow via parsingFlow via writingFlow
+  }
+
   def routes: Route =
-    index ~ findAllMovies ~ createFilm ~ findAllByFilters ~ movieInfo
+    index ~
+      findAllMovies ~
+      createFilm ~
+      findAllByFilters ~
+      movieInfo ~
+      websocket
 }

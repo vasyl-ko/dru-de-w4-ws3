@@ -11,12 +11,15 @@ import akka.stream.scaladsl._
 import akka.util.ByteString
 import io.circe.syntax._
 import io.circe.parser._
+import client.MovieClient
 
 object MovieCreator extends StrictLogging {
   def main(args: Array[String]): Unit = {
     implicit val system = ActorSystem("movie-creator")
     implicit val mat = ActorMaterializer()
     implicit val ec: ExecutionContext = ExecutionContext.global
+
+    val movieClient = new MovieClient()
 
     val filePath = Paths.get("./movies.txt")
 
@@ -38,12 +41,18 @@ object MovieCreator extends StrictLogging {
           List(movie)
       }
 
+    val savingFlow = Flow[Movie]
+      .mapAsyncUnordered(8) { movie =>
+        movieClient createMovie movie
+      }
+
     val printSink =
-      Sink.foreach[model.Movie](movie => logger.info(s"Parsed movie: $movie"))
+      Sink.foreach[String](savingResult => logger.info(s"Result: $savingResult"))
 
     val graph = fileSource
       .via(linesFlow)
       .via(moviesFlow)
+      .via(savingFlow)
       .toMat(printSink)(Keep.right)
 
     val futureDone = graph.run()
